@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Orders Dashboard · Performance{% endblock %}
+{% block content %}
+<div class="grid-cards">
+  <div class="card">
+    <h2>Throughput / Hour</h2>
+    <div class="metric" id="metric-throughput">{{ '{:.2f}'.format(metrics.throughput_per_hour) }}</div>
+    <p>Updated every 10s from live metrics.</p>
+  </div>
+  <div class="card">
+    <h2>Orders Due ≤ 24h</h2>
+    <div class="metric" id="metric-due">{{ metrics.due_within_24h }}</div>
+  </div>
+  <div class="card">
+    <h2>High-Priority Backlog</h2>
+    <div class="metric" id="metric-priority">{{ metrics.high_priority_backlog }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>State Breakdown</h2>
+  <canvas id="stateChart" height="160"></canvas>
+</div>
+
+<div class="card">
+  <h2>Live Metrics Feed</h2>
+  <pre id="metrics-json" style="background: rgba(15,23,42,0.85); padding: 1rem; border-radius: 12px; overflow: auto; max-height: 280px;"></pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+  const apiUrl = '/dashboard/api/metrics';
+  const chartCtx = document.getElementById('stateChart').getContext('2d');
+  let stateChart = null;
+
+  function renderChart(metrics) {
+    const labels = Object.keys(metrics.state_counts || {});
+    const data = Object.values(metrics.state_counts || {});
+    if (!stateChart) {
+      stateChart = new Chart(chartCtx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Orders',
+            backgroundColor: '#38bdf8',
+            data,
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } }
+        }
+      });
+    } else {
+      stateChart.data.labels = labels;
+      stateChart.data.datasets[0].data = data;
+      stateChart.update();
+    }
+  }
+
+  async function refreshMetrics() {
+    try {
+      const resp = await fetch(apiUrl, { cache: 'no-store' });
+      if (!resp.ok) throw new Error(await resp.text());
+      const metrics = await resp.json();
+      document.getElementById('metric-throughput').textContent = metrics.throughput_per_hour.toFixed(2);
+      document.getElementById('metric-due').textContent = metrics.due_within_24h;
+      document.getElementById('metric-priority').textContent = metrics.high_priority_backlog;
+      document.getElementById('metrics-json').textContent = JSON.stringify(metrics, null, 2);
+      renderChart(metrics);
+    } catch (err) {
+      console.error('Failed to refresh metrics', err);
+    }
+  }
+
+  refreshMetrics();
+  setInterval(refreshMetrics, 10000);
+</script>
+{% endblock %}

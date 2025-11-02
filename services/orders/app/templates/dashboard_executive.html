@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Orders Dashboard · Executive Summary{% endblock %}
+{% block content %}
+<div class="grid-cards">
+  <div class="card">
+    <h2>Service SLA</h2>
+    <div class="metric">{{ '{:.1f}'.format(metrics.throughput_per_hour or 0) }} / hr</div>
+    <p>Current order throughput (24h rolling).</p>
+  </div>
+  <div class="card">
+    <h2>Orders In Flight</h2>
+    <div class="metric">{{ metrics.total_orders }}</div>
+    <p>Total orders tracked across all states.</p>
+  </div>
+  <div class="card">
+    <h2>Due ≤ 24h</h2>
+    <div class="metric">{{ metrics.due_within_24h }}</div>
+    <p>Orders requiring attention in the next 24 hours.</p>
+  </div>
+  <div class="card">
+    <h2>High Priority Backlog</h2>
+    <div class="metric">{{ metrics.high_priority_backlog }}</div>
+    <p>Outstanding orders with priority 1–2 not yet completed.</p>
+  </div>
+</div>
+
+<div class="card">
+  <h2>State Breakdown</h2>
+  <table>
+    <thead>
+      <tr><th>State</th><th>Orders</th></tr>
+    </thead>
+    <tbody>
+      {% for state, count in metrics.state_counts.items() %}
+      <tr>
+        <td><span class="state-badge">{{ state }}</span></td>
+        <td>{{ count }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2">No active orders.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Milestones & Compliance</h2>
+  <ul>
+    <li>Next staging validation window: <strong>TBD</strong></li>
+    <li>Security baseline: <strong>Complete (info-level warnings only)</strong></li>
+    <li>Performance target: <strong>100 orders/min</strong> – pending staging DB/Kafka.</li>
+  </ul>
+  <div class="filters">
+    <a class="button" href="/dashboard/performance">View Performance Charts</a>
+    <a class="button" href="/dashboard/audit">Review Audit Trail</a>
+    <a class="button" href="/dashboard/api/metrics">Download Metrics</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Recent State Changes</h2>
+  <table>
+    <thead>
+      <tr><th>Order</th><th>From</th><th>To</th><th>Timestamp</th></tr>
+    </thead>
+    <tbody>
+      {% for audit in metrics.recent_audit[:3] %}
+      <tr>
+        <td>{{ audit.order_id }}</td>
+        <td>{{ audit.previous_state or '-' }}</td>
+        <td><span class="state-badge">{{ audit.new_state }}</span></td>
+        <td>{{ audit.changed_at.strftime('%Y-%m-%d %H:%M') if audit.changed_at else '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">No recent transitions.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

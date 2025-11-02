@@ -1,0 +1,11 @@
+{
+  "safety": {
+    "zones": {
+      "safe_zone_b": {
+        "radius": 2.0,
+        "units": "m",
+        "type": "rectangular"
+      }
+    }
+  }
+}

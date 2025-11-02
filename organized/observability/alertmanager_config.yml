@@ -1,0 +1,293 @@
+# Alertmanager routing configuration for eFab platform
+# Implements ADR-005 observability integration with PagerDuty and Slack routing
+#
+# Deployment:
+#   kubectl apply -f alertmanager-configmap.yaml
+#
+# Testing:
+#   amtool config routes test --config.file=alertmanager_config.yml
+
+global:
+  # Global SMTP configuration for email alerts
+  smtp_smarthost: 'smtp.efab.example.com:587'
+  smtp_from: 'alerts@efab.example.com'
+  smtp_auth_username: 'alertmanager'
+  smtp_auth_password: '{{ SMTP_PASSWORD }}'  # Use secret injection
+
+  # Slack API URL (set via environment variable or secret)
+  slack_api_url: '{{ SLACK_WEBHOOK_URL }}'
+
+  # PagerDuty integration key
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+  # Default resolve timeout
+  resolve_timeout: 5m
+
+# Notification templates
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree definition
+route:
+  # Default receiver for all alerts
+  receiver: 'default-slack'
+
+  # Group alerts by cluster, alertname, and severity
+  group_by: ['alertgroup', 'environment', 'severity']
+
+  # Wait time before sending initial notification
+  group_wait: 30s
+
+  # Wait time before sending notifications about new alerts in the same group
+  group_interval: 5m
+
+  # Wait time before re-sending notifications for alerts
+  repeat_interval: 4h
+
+  # Routes for specific alert types
+  routes:
+    # Critical alerts - Page on-call via PagerDuty
+    - match:
+        severity: critical
+      receiver: 'pagerduty-critical'
+      group_wait: 10s
+      group_interval: 2m
+      repeat_interval: 1h
+      continue: true  # Also send to other receivers
+
+    - match:
+        severity: critical
+      receiver: 'slack-critical'
+      group_wait: 10s
+
+    # Safety alerts - Highest priority routing
+    - match:
+        alertgroup: safety
+      receiver: 'pagerduty-safety'
+      group_wait: 5s
+      group_interval: 1m
+      repeat_interval: 30m
+      continue: true
+
+    - match:
+        alertgroup: safety
+      receiver: 'slack-safety'
+      group_wait: 5s
+
+    # FinOps alerts - Route to finance team
+    - match:
+        alertgroup: finops
+      receiver: 'slack-finops'
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 6h
+
+    - match:
+        alertgroup: finops
+        severity: critical
+      receiver: 'email-finops-team'
+      continue: true
+
+    # Performance alerts - Route to platform team
+    - match:
+        alertgroup: performance
+      receiver: 'slack-platform'
+      group_wait: 1m
+      group_interval: 5m
+      repeat_interval: 4h
+
+    # Warning-level alerts - Slack only (no pages)
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      group_wait: 2m
+      group_interval: 10m
+      repeat_interval: 6h
+
+    # Production environment - Higher priority
+    - match:
+        environment: prod
+      routes:
+        - match:
+            severity: critical
+          receiver: 'pagerduty-prod-critical'
+          group_wait: 5s
+
+    # Staging environment - Lower priority
+    - match:
+        environment: staging
+      receiver: 'slack-staging'
+      group_wait: 5m
+      repeat_interval: 12h
+
+# Inhibition rules - Suppress dependent alerts
+inhibit_rules:
+  # Suppress warning alerts when critical alerts are firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertgroup', 'environment', 'site', 'cell']
+
+  # Suppress performance alerts when safety alerts are firing
+  - source_match:
+      alertgroup: 'safety'
+    target_match:
+      alertgroup: 'performance'
+    equal: ['environment', 'site', 'cell']
+
+  # Suppress individual service alerts when cluster-wide alerts fire
+  - source_match:
+      alertname: 'ClusterDown'
+    target_match_re:
+      alertname: '.*Down'
+    equal: ['environment']
+
+# Receiver definitions
+receivers:
+  # Default Slack channel for uncategorized alerts
+  - name: 'default-slack'
+    slack_configs:
+      - channel: '#alerts-default'
+        title: 'Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Environment:* {{ .GroupLabels.environment }}
+          *Severity:* {{ .GroupLabels.severity }}
+          {{ range .Alerts }}
+            *Alert:* {{ .Labels.alertname }}
+            *Description:* {{ .Annotations.description }}
+            *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+
+  # PagerDuty - Critical alerts
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key: '{{ PAGERDUTY_CRITICAL_KEY }}'
+        description: '{{ .CommonAnnotations.summary }}'
+        details:
+          alert_name: '{{ .GroupLabels.alertname }}'
+          environment: '{{ .GroupLabels.environment }}'
+          severity: '{{ .GroupLabels.severity }}'
+          runbook_url: '{{ .CommonAnnotations.runbook_url }}'
+          dashboard_url: '{{ .CommonAnnotations.dashboard_url }}'
+        client: 'eFab Alertmanager'
+        client_url: 'https://alertmanager.efab.example.com'
+
+  # PagerDuty - Safety alerts (highest priority)
+  - name: 'pagerduty-safety'
+    pagerduty_configs:
+      - service_key: '{{ PAGERDUTY_SAFETY_KEY }}'
+        description: 'SAFETY: {{ .CommonAnnotations.summary }}'
+        severity: 'critical'
+        details:
+          alert_name: '{{ .GroupLabels.alertname }}'
+          environment: '{{ .GroupLabels.environment }}'
+          site: '{{ .GroupLabels.site }}'
+          cell: '{{ .GroupLabels.cell }}'
+          runbook_url: '{{ .CommonAnnotations.runbook_url }}'
+          impact: '{{ .CommonAnnotations.impact }}'
+        client: 'eFab Alertmanager - Safety'
+
+  # PagerDuty - Production critical
+  - name: 'pagerduty-prod-critical'
+    pagerduty_configs:
+      - service_key: '{{ PAGERDUTY_PROD_KEY }}'
+        description: 'PROD CRITICAL: {{ .CommonAnnotations.summary }}'
+        severity: 'critical'
+
+  # Slack - Critical alerts
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '#alerts-critical'
+        title: ':rotating_light: CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Environment:* {{ .GroupLabels.environment }}
+          *Site/Cell:* {{ .GroupLabels.site }}/{{ .GroupLabels.cell }}
+          *Impact:* {{ .CommonAnnotations.impact }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          *Dashboard:* {{ .Annotations.dashboard_url }}
+          *Owner:* {{ .CommonAnnotations.owner }}
+        color: 'danger'
+        send_resolved: true
+
+  # Slack - Safety alerts
+  - name: 'slack-safety'
+    slack_configs:
+      - channel: '#alerts-safety'
+        title: ':warning: SAFETY ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Site/Cell:* {{ .GroupLabels.site }}/{{ .GroupLabels.cell }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          *Priority:* {{ .CommonAnnotations.priority }}
+        color: 'danger'
+        send_resolved: true
+
+  # Slack - FinOps alerts
+  - name: 'slack-finops'
+    slack_configs:
+      - channel: '#alerts-finops'
+        title: ':money_with_wings: FinOps Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Environment:* {{ .GroupLabels.environment }}
+          *Site/Cell:* {{ .GroupLabels.site }}/{{ .GroupLabels.cell }}
+          *Impact:* {{ .CommonAnnotations.impact }}
+          *Action Required:* {{ .CommonAnnotations.action_required }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+        color: 'warning'
+        send_resolved: true
+
+  # Slack - Platform/Performance alerts
+  - name: 'slack-platform'
+    slack_configs:
+      - channel: '#alerts-platform'
+        title: ':chart_with_downwards_trend: Performance Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Environment:* {{ .GroupLabels.environment }}
+          *Component:* {{ .GroupLabels.component }}
+          *Impact:* {{ .CommonAnnotations.impact }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+        send_resolved: true
+
+  # Slack - Warning-level alerts
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#alerts-warnings'
+        title: ':warning: Warning: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Environment:* {{ .GroupLabels.environment }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+        color: 'warning'
+        send_resolved: true
+
+  # Slack - Staging environment
+  - name: 'slack-staging'
+    slack_configs:
+      - channel: '#alerts-staging'
+        title: '[STAGING] Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+        send_resolved: true
+
+  # Email - FinOps team
+  - name: 'email-finops-team'
+    email_configs:
+      - to: 'finops-team@efab.example.com'
+        subject: 'eFab FinOps Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>{{ .CommonAnnotations.summary }}</h2>
+          <p><strong>Environment:</strong> {{ .GroupLabels.environment }}</p>
+          <p><strong>Severity:</strong> {{ .GroupLabels.severity }}</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          <p><strong>Impact:</strong> {{ .CommonAnnotations.impact }}</p>
+          <p><strong>Action Required:</strong> {{ .CommonAnnotations.action_required }}</p>
+          <p><a href="{{ .CommonAnnotations.runbook_url }}">Runbook</a> | <a href="{{ .CommonAnnotations.dashboard_url }}">Dashboard</a></p>
+        send_resolved: true

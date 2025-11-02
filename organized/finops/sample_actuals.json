@@ -1,0 +1,25 @@
+{
+  "records": [
+    {
+      "identifier": "cell-a",
+      "units_produced": 10,
+      "direct_costs": {"material": 1000, "labor": 550, "maintenance": 120},
+      "drivers": {"cell_runtime_minutes": 620, "throughput_units": 10},
+      "target_unit_cost": 180
+    },
+    {
+      "identifier": "cell-b",
+      "units_produced": 8,
+      "direct_costs": {"material": 800, "labor": 420, "maintenance": 90},
+      "drivers": {"cell_runtime_minutes": 480, "throughput_units": 8},
+      "target_unit_cost": 175
+    }
+  ],
+  "shared_metrics": {
+    "edge_energy_kwh": 950,
+    "production_overhead_cost": 1800
+  },
+  "capital_projects": [
+    {"amortized_monthly_cost": 1400}
+  ]
+}

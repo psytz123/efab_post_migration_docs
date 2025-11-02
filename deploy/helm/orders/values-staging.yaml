@@ -1,0 +1,42 @@
+image:
+  tag: 0.1.0
+
+replicaCount: 3
+
+env:
+  databaseUrl: postgresql://orders:orders@orders-db.staging.svc.cluster.local:5432/orders
+  eventBrokerUrl: kafka://redpanda-kafka.staging.svc.cluster.local:9092
+  featureFlagTaskIntent: true
+  siteId: bk-mill-stg
+
+mtls:
+  enabled: true
+  caSecret: orders-ca
+  certSecret: orders-cert
+  certKey: tls.key
+  certCrt: tls.crt
+
+auditRetention:
+  enabled: true
+  years: 7
+  bucket: s3://efab-audit/orders
+
+ingress:
+  enabled: true
+  hosts:
+    - orders-stg.example.com
+  tls:
+    - secretName: orders-cert
+      hosts:
+        - orders-stg.example.com
+
+networkPolicy:
+  enabled: true
+  allowedIngress:
+    - namespace: efab-gateway
+    - namespace: efab-scheduler
+    - namespace: efab-perf
+  allowedEgress:
+    - namespace: efab-kafka
+    - namespace: efab-postgres
+    - namespace: efab-telemetry

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{% block title %}Orders Dashboard{% endblock %}</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        font-family: "Inter", system-ui, sans-serif;
+        background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+        color: #e2e8f0;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      header {
+        padding: 1.5rem 2.5rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        backdrop-filter: blur(18px);
+        background: rgba(15, 23, 42, 0.6);
+      }
+      header h1 {
+        margin: 0 0 0.4rem;
+        font-size: 1.75rem;
+        letter-spacing: 0.04em;
+      }
+      nav {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+      }
+      nav a {
+        padding: 0.35rem 0.85rem;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #94a3b8;
+      }
+      nav a.active {
+        background: rgba(56, 189, 248, 0.18);
+        color: #e0f2fe;
+        box-shadow: 0 12px 30px -18px rgba(56, 189, 248, 0.6);
+      }
+      main {
+        flex: 1;
+        padding: 2.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+      .grid-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .card {
+        background: rgba(15, 23, 42, 0.75);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 18px;
+        padding: 1.6rem;
+        box-shadow: 0 24px 48px -28px rgba(15, 23, 42, 0.85);
+      }
+      .card h2 {
+        margin: 0 0 1rem;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #94a3b8;
+      }
+      .metric {
+        font-size: 2.4rem;
+        font-weight: 700;
+        color: #38bdf8;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 0.75rem 0.9rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        text-align: left;
+      }
+      th {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #94a3b8;
+      }
+      tbody tr:hover td {
+        background: rgba(148, 163, 184, 0.08);
+      }
+      .state-badge {
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        background: rgba(56, 189, 248, 0.16);
+        color: #bae6fd;
+      }
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      .filters form,
+      .filters a.button {
+        display: inline-flex;
+        gap: 0.5rem;
+        align-items: center;
+        padding: 0.35rem 0.9rem;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(15, 23, 42, 0.85);
+        color: #e2e8f0;
+        font-size: 0.85rem;
+      }
+      button,
+      select {
+        font: inherit;
+        color: inherit;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+      }
+      select {
+        padding: 0.25rem;
+        border-radius: 6px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        background: rgba(15, 23, 42, 0.8);
+      }
+      footer {
+        padding: 1.5rem 2.5rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+        font-size: 0.75rem;
+        color: #64748b;
+        background: rgba(15, 23, 42, 0.6);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.18);
+        color: #bfdbfe;
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Orders Command Center</h1>
+      <nav>
+        <a href="/dashboard" class="{% if nav == 'overview' %}active{% endif %}">Overview</a>
+        <a href="/dashboard/orders" class="{% if nav == 'orders' %}active{% endif %}">Orders</a>
+        <a href="/dashboard/audit" class="{% if nav == 'audit' %}active{% endif %}">Audit Log</a>
+        <a href="/dashboard/performance" class="{% if nav == 'performance' %}active{% endif %}">Performance</a>
+        <a href="/dashboard/executive" class="{% if nav == 'executive' %}active{% endif %}">Executive</a>
+        <a href="/RUNBOOK.md" class="button">Runbooks</a>
+        <a href="/docs" class="button">API Docs</a>
+        <a href="/dashboard/api/metrics" class="button">Metrics JSON</a>
+      </nav>
+    </header>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+    <footer>
+      Live data sourced from Orders mock database. Regenerate via <code>scripts/launch_orders_mock.sh</code> for demos.
+    </footer>
+  </body>
+</html>

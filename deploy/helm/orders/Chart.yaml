@@ -1,0 +1,5 @@
+apiVersion: v2
+name: orders-service
+description: Helm chart for eFab Orders service
+version: 0.1.0
+appVersion: "0.1.0"

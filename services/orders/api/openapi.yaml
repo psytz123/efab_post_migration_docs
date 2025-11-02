@@ -1,0 +1,229 @@
+openapi: 3.1.0
+info:
+  title: eFab Orders API
+  version: 0.1.0
+  description: REST contract for Orders service (pilot scope).
+servers:
+  - url: https://api.efab.example.com
+    description: API Gateway (prod)
+  - url: https://staging-api.efab.example.com
+    description: Staging
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    OrderState:
+      type: string
+      enum: [draft, firm, released, paused, completed, cancelled]
+    Order:
+      type: object
+      required: [order_id, sku, quantity, state, due_date, site_id]
+      properties:
+        order_id:
+          type: string
+          example: SO-12345
+        customer_ref:
+          type: string
+        sku:
+          type: string
+        quantity:
+          type: number
+        uom:
+          type: string
+        state:
+          $ref: '#/components/schemas/OrderState'
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+        due_date:
+          type: string
+          format: date-time
+        site_id:
+          type: string
+        routings:
+          type: array
+          items:
+            type: object
+            required: [seq, op_id, cell_id]
+            properties:
+              seq: { type: integer }
+              op_id: { type: string }
+              cell_id: { type: string }
+              changeover_sec: { type: integer }
+        lots:
+          type: array
+          items:
+            type: object
+            required: [lot_id, quantity, cell_id]
+            properties:
+              lot_id: { type: string }
+              quantity: { type: number }
+              cell_id: { type: string }
+              planned_start:
+                type: string
+                format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+    CreateOrderRequest:
+      type: object
+      required: [sku, quantity, due_date, site_id]
+      properties:
+        customer_ref: { type: string }
+        sku: { type: string }
+        quantity: { type: number }
+        uom: { type: string }
+        due_date: { type: string, format: date-time }
+        site_id: { type: string }
+        priority: { type: integer, minimum: 1, maximum: 5 }
+        routings: { $ref: '#/components/schemas/Order/properties/routings' }
+        lots: { $ref: '#/components/schemas/Order/properties/lots' }
+    UpdateOrderRequest:
+      type: object
+      properties:
+        priority: { type: integer, minimum: 1, maximum: 5 }
+        due_date: { type: string, format: date-time }
+        state: { $ref: '#/components/schemas/OrderState' }
+        pause_reason: { type: string }
+    ListOrdersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Order' }
+        next_cursor:
+          type: string
+paths:
+  /orders:
+    post:
+      summary: Create a new production order
+      operationId: createOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrderRequest' }
+      responses:
+        '201':
+          description: Order accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '409': { description: Duplicate order reference }
+        '422': { description: Validation error }
+    get:
+      summary: List orders with filters
+      operationId: listOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: state
+          schema: { $ref: '#/components/schemas/OrderState' }
+        - in: query
+          name: cell
+          schema: { type: string }
+        - in: query
+          name: after
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated order list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListOrdersResponse' }
+  /orders/{order_id}:
+    get:
+      summary: Get order by id
+      operationId: getOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Order found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404': { description: Not found }
+    patch:
+      summary: Update order attributes or state
+      operationId: updateOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateOrderRequest' }
+      responses:
+        '200': { description: Order updated }
+        '400': { description: Invalid transition }
+        '409': { description: Conflict }
+  /orders/{order_id}/lots:
+    post:
+      summary: Create or update lots for an order
+      operationId: upsertOrderLots
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lots]
+              properties:
+                lots:
+                  type: array
+                  items: { $ref: '#/components/schemas/Order/properties/lots/items' }
+      responses:
+        '200': { description: Lots updated }
+        '404': { description: Order not found }
+  /orders/{order_id}/state:
+    post:
+      summary: Transition order state (scheduler only)
+      operationId: changeOrderState
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state: { $ref: '#/components/schemas/OrderState' }
+                reason: { type: string }
+      responses:
+        '200': { description: State updated }
+        '409': { description: Invalid transition }

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Orders Dashboard · Overview{% endblock %}
+{% block content %}
+<div class="grid-cards">
+  <div class="card">
+    <h2>Total Orders</h2>
+    <div class="metric">{{ metrics.total_orders }}</div>
+  </div>
+  <div class="card">
+    <h2>Orders (Last 24h)</h2>
+    <div class="metric">{{ metrics.orders_last_24h }}</div>
+  </div>
+  <div class="card">
+    <h2>Throughput / Hour</h2>
+    <div class="metric">{{ '{:.2f}'.format(metrics.throughput_per_hour) }}</div>
+  </div>
+</div>
+
+<div class="grid-cards">
+  <div class="card">
+    <h2>State Distribution</h2>
+    <table>
+      <thead>
+        <tr><th>State</th><th>Count</th></tr>
+      </thead>
+      <tbody>
+        {% for state, count in metrics.state_counts.items() %}
+        <tr>
+          <td><span class="state-badge">{{ state }}</span></td>
+          <td>{{ count }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2">No data available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>Recent Orders</h2>
+    <table>
+      <thead>
+        <tr><th>Order</th><th>SKU</th><th>Qty</th><th>State</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        {% for order in metrics.recent_orders %}
+        <tr>
+          <td>{{ order.order_id }}</td>
+          <td>{{ order.sku }}</td>
+          <td>{{ '{:.0f}'.format(order.quantity) }}</td>
+          <td><span class="state-badge">{{ order.state }}</span></td>
+          <td>{{ order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No recent orders.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Recent Audit Events</h2>
+  <table>
+    <thead>
+      <tr><th>Order</th><th>From</th><th>To</th><th>User</th><th>Changed</th></tr>
+    </thead>
+    <tbody>
+      {% for audit in metrics.recent_audit %}
+      <tr>
+        <td>{{ audit.order_id }}</td>
+        <td>{{ audit.previous_state or '-' }}</td>
+        <td><span class="state-badge">{{ audit.new_state }}</span></td>
+        <td>{{ audit.changed_by }}</td>
+        <td>{{ audit.changed_at.strftime('%Y-%m-%d %H:%M') if audit.changed_at else '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">No audit events recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Quick Actions</h2>
+  <div class="filters">
+    <a class="button" href="/dashboard/orders">View Orders Table</a>
+    <a class="button" href="/dashboard/audit">Inspect Audit Log</a>
+    <a class="button" href="/dashboard/api/metrics">Download Metrics JSON</a>
+  </div>
+  <p>Need more seed data? Re-run <code>scripts/seed_orders_mock.py --count 5</code> and refresh.</p>
+</div>
+{% endblock %}

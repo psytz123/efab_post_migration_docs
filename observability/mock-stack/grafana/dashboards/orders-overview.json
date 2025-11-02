@@ -1,0 +1,96 @@
+{
+  "uid": "orders-overview",
+  "title": "Orders Service Overview",
+  "tags": ["orders", "mock"],
+  "timezone": "",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Orders",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "orders_total",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": { "mode": "palette-classic" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Orders Last 24h",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "orders_created_last_24h",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] }
+    },
+    {
+      "type": "stat",
+      "title": "Throughput / Hour",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "orders_throughput_per_hour",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+    },
+    {
+      "type": "piechart",
+      "title": "Orders by State",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 9 },
+      "targets": [
+        {
+          "expr": "orders_state_count",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+        "legend": { "displayMode": "table", "placement": "right" }
+      }
+    },
+    {
+      "type": "timeSeries",
+      "title": "Orders Total (Delta)",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 9 },
+      "targets": [
+        {
+          "expr": "rate(orders_total[5m])",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": { "mode": "continuous" }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

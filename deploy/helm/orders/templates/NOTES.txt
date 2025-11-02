@@ -1,0 +1,14 @@
+1. Get the application URL by running these commands:
+{{- if .Values.ingress.enabled }}
+  {{- range $host := .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{$host}}
+  {{- end }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "orders-service.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://127.0.0.1:8080/health/ready
+{{- end }}
+
+2. Ensure Postgres has `pgcrypto` extension enabled:
+   kubectl -n efab-postgres exec -it orders-db-0 -- psql -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto;'
+
+3. Apply Vault annotations if secrets are managed externally.
